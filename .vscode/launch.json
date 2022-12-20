@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-ReggieApplication<reggie_take_out>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.ghb.reggie.ReggieApplication",
+            "projectName": "reggie_take_out",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}

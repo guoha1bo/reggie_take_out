@@ -13,6 +13,8 @@ import com.ghb.reggie.service.SetmealService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service("CategoryService")
 public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> implements CategoryService {
 
@@ -42,5 +44,14 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
             throw new CustomException("当前分类项关联了套餐，不能删除");
         }
         super.removeById(id);
+    }
+
+    @Override
+    public List<Category> list(Category category) {
+        LambdaQueryWrapper<Category> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(category.getType() != null,Category::getType,category.getType());
+        queryWrapper.orderByDesc(Category::getSort).orderByDesc(Category::getUpdateTime);
+        List<Category> list = super.list(queryWrapper);
+        return list;
     }
 }

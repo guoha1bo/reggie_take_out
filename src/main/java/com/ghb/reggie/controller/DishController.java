@@ -44,6 +44,21 @@ public class DishController {
     public R<List<Dish>> list(Dish dish){
         return R.success(dishService.listById(dish.getCategoryId()));
     }
+    @PostMapping("/status/{status}")
+    public R<String> updateStatus(@PathVariable("status") Integer status,@RequestParam List<Long> ids){
+        dishService.updateStatus(status,ids);
+        return R.success("菜品停售成功！");
+    }
 
+    @DeleteMapping
+    public R<String> delete(@RequestParam("ids") List<Long> ids){
+        boolean b = dishService.deleteInSetmeal(ids);
+        if (b){
+            return R.success("菜品删除成功！");
+        }else{
+            return R.error("菜品删除失败！");
+        }
+
+    }
 
 }

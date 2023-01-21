@@ -3,14 +3,11 @@ package com.ghb.reggie.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.ghb.reggie.common.CustomException;
 import com.ghb.reggie.dto.DishDto;
-import com.ghb.reggie.entity.Category;
-import com.ghb.reggie.entity.Dish;
-import com.ghb.reggie.entity.DishFlavor;
+import com.ghb.reggie.entity.*;
 import com.ghb.reggie.mapper.DishMapper;
-import com.ghb.reggie.service.CategoryService;
-import com.ghb.reggie.service.DishFlavorService;
-import com.ghb.reggie.service.DishService;
+import com.ghb.reggie.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -33,6 +31,12 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
 
     @Autowired
     private CategoryService categoryService;
+
+    @Autowired
+    private SetmealDishService setmealDishService;
+
+    @Autowired
+    private SetmealService setmealService;
     @Transactional
     public void save(DishDto dishDto){
         log.info(dishDto.toString());
@@ -110,5 +114,74 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
         return list;
     }
 
+    @Override
+    public void updateStatus(Integer status, List<Long> ids) {
+        LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
+        //SELECT id,name FROM `dish` WHERE id in(1612294874583834626,1612294389017649153,1612292811472863234,1612292615431094273);
+        queryWrapper.in(ids != null,Dish::getId,ids);
+        List<Dish> list = dishService.list(queryWrapper);
+        for (Dish dish : list) {
+            if (dish != null){
+                dish.setStatus(status);
+                dishService.updateById(dish);
+            }
+        }
+    }
 
+    @Transactional
+    public void deleteByIds(List<Long> ids){
+        LambdaQueryWrapper<Dish> queryWrapper = new LambdaQueryWrapper<>();
+//        SELECT id,name from dish where id in(1413342036832100354,1413385247889891330,1612294389017649153);
+        queryWrapper.in(Dish::getId,ids);
+        List<Dish> list = dishService.list(queryWrapper);
+        for(Dish dish: list){
+            if (dish.getStatus() == 0){
+                this.removeById(dish.getId());
+            }else{
+                throw new CustomException("删除菜品中有在售菜品，无法删除");
+            }
+        }
+    }
+    @Override
+    public boolean deleteInSetmeal(List<Long> ids) {
+        boolean flag = true;
+        LambdaQueryWrapper<SetmealDish> queryWrapper = new LambdaQueryWrapper<>();
+
+        //SELECT setmeal_id from setmeal_dish where dish_id in(1413342036832100354,1413385247889891330,1612294389017649153);
+        queryWrapper.in(SetmealDish::getDishId,ids);
+        List<SetmealDish> setmealDishList = setmealDishService.list(queryWrapper);
+        ArrayList<Long> setmealIdList = new ArrayList<>();
+        for(SetmealDish setmealDish : setmealDishList){
+            Long setmealId = setmealDish.getSetmealId();
+            setmealIdList.add(setmealId);
+        }
+        //如果删除菜品没有关联套餐 可以删除
+        if (setmealIdList.size() == 0){
+            this.deleteByIds(ids);
+            LambdaQueryWrapper<DishFlavor> queryWrapper1 = new LambdaQueryWrapper<>();
+            queryWrapper1.in(DishFlavor::getDishId,ids);
+            dishFlavorService.remove(queryWrapper1);
+            LambdaQueryWrapper<SetmealDish> queryWrapper2 = new LambdaQueryWrapper<>();
+            queryWrapper2.in(SetmealDish::getDishId,ids);
+            setmealDishService.remove(queryWrapper2);
+        }else if(setmealIdList.size() > 0){//如果删除菜品有关联套餐 并且正在售卖 不能删除
+            LambdaQueryWrapper<Setmeal> queryWrapper2 = new LambdaQueryWrapper<>();
+            queryWrapper2.in(Setmeal::getId, setmealIdList);
+            List<Setmeal> setmealList = setmealService.list(queryWrapper2);
+            for (Setmeal setmeal:setmealList) {
+                if (setmeal.getStatus() == 1){
+                    flag = false;
+                    return flag;
+                }
+            }
+        }
+        this.deleteByIds(ids);
+        LambdaQueryWrapper<DishFlavor> queryWrapper1 = new LambdaQueryWrapper<>();
+        queryWrapper1.in(DishFlavor::getDishId,ids);
+        dishFlavorService.remove(queryWrapper1);
+        LambdaQueryWrapper<SetmealDish> queryWrapper2 = new LambdaQueryWrapper<>();
+        queryWrapper2.in(SetmealDish::getDishId,ids);
+        setmealDishService.remove(queryWrapper2);
+        return flag;
+    }
 }

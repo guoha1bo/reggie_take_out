@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -112,5 +113,44 @@ public class SetmealServiceImpl extends ServiceImpl<SetmealMapper, Setmeal> impl
         List<SetmealDish> list = setmealDishService.list(queryWrapper);
         setmealDto.setSetmealDishes(list);
         return setmealDto;
+    }
+
+    @Override
+    public void updateStatus(Integer status, List<Long> ids) {
+        LambdaQueryWrapper<Setmeal> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(ids != null,Setmeal::getId,ids);
+        List<Setmeal> list = super.list(queryWrapper);
+        for (Setmeal item : list){
+            if (item != null){
+                item.setStatus(status);
+                super.updateById(item);
+            }
+        }
+    }
+    @Transactional
+    @Override
+    public Boolean deleteSetmeal(List<Long> ids) {
+        //先查询删除的套餐售卖状态是否为1  为1 无法删除返回布尔值  为0进入条件
+        Boolean flag = true;
+        LambdaQueryWrapper<Setmeal> queryWrapper1 = new LambdaQueryWrapper<>();
+        queryWrapper1.in(ids != null,Setmeal::getId,ids);
+        List<Setmeal> list = super.list(queryWrapper1);
+        for (Setmeal setmeal : list){
+            if (setmeal.getStatus() == 1){
+                flag = false;
+                return flag;
+            }
+        }
+
+        //第一步先删除掉套餐菜品关联表 将套餐关联的菜品删除
+        LambdaQueryWrapper<SetmealDish> queryWrapper = new LambdaQueryWrapper();
+        //SELECT id,name  FROM `setmeal_dish` where setmeal_id in(1415580119015145474,1615267557973958657)
+        queryWrapper.in(ids != null, SetmealDish::getSetmealId, ids);
+        setmealDishService.remove(queryWrapper);
+
+        //第二部删除套餐
+        super.remove(queryWrapper1);
+        return flag;
+
     }
 }
